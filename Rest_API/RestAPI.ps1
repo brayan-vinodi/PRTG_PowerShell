@@ -32,7 +32,7 @@ try {
     # Extract the specific data from the response
     $data = $response.receive.data
 
-    # Add balance to JSON result
+    # Add data to JSON result
     $jsonResult.prtg.result += @{
         channel = "Name"
         value = [INT]$data
