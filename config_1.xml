@@ -1,0 +1,640 @@
+<Sysmon schemaversion="4.90">
+	<EventFiltering>
+		<RuleGroup name="" groupRelation="or">
+			<ProcessCreate onmatch="include">
+				<!-- COMMENT: T1059 Section - Command and Scripting Interpreter -->
+				<Rule name="Windows Command Shell" groupRelation="or">
+					<OriginalFileName name="Windows Command Shell" condition="is">cmd.exe</OriginalFileName>
+					<Image name="Windows Command Shell" condition="image">cmd.exe</Image>
+				</Rule>
+				
+				<Rule name="PowerShell" groupRelation="or">
+					<OriginalFileName name="PowerShell" condition="image">powershell.exe</OriginalFileName>
+					<OriginalFileName name="PowerShell" condition="image">powershell_ise.exe</OriginalFileName>
+					<OriginalFileName name="PowerShell" condition="contains">Sqlps.exe</OriginalFileName>
+					<CommandLine name="technique_id=T1059.001,technique_name=PowerShell" condition="contains">pester</CommandLine>
+				</Rule>
+				
+				<Rule name="Obfuscated Files or Information" groupRelation="or">
+					<CommandLine name="Obfuscated Files or Information" condition="contains">FromBase64</CommandLine>
+					<CommandLine name="Obfuscated Files or Information" condition="contains">decompress</CommandLine>
+					<CommandLine name="Obfuscated Files or Information" condition="contains">gzip</CommandLine>
+					<CommandLine name="Obfuscated Files or Information" condition="contains">http</CommandLine>
+					<!--CommandLine: "C:\Program Files\Mozilla Firefox\pingsender.exe" https://incoming.telemetry.mozilla.org/submit/telemetry/f7f92a55-9217-4b13-a62b-2374c99e5e08/event/Firefox/121.0.1/release/20240108143603?v=4 C:\Users\anu.p230515\AppData\Roaming\Mozilla\Firefox\Profiles\3xb1dsf2.default-release\saved-telemetry-pings\f7f92a55-9217-4b13-a62b-2374c99e5e08 https://incoming.telemetry.mozilla.org/submit/telemetry/93ab6d53-3382-49e8-bb1f-5340daf1eb99/main/Firefox/121.0.1/release/20240108143603?v=4 C:\Users\anu.p230515\AppData\Roaming\Mozilla\Firefox\Profiles\3xb1dsf2.default-release\saved-telemetry-pings\93ab6d53-3382-49e8-bb1f-5340daf1eb99
+						CurrentDirectory: C:\Program Files\Mozilla Firefox\ -->
+					<CommandLine name="Obfuscated Files or Information" condition="contains">replace</CommandLine> <!--Kill Unicorns-->
+				</Rule>
+				
+				<Rule name="Accessibility" groupRelation="or">
+                    <ParentImage name="Accessibility Features" condition="image">sethc.exe</ParentImage>
+                    <ParentImage name="Accessibility Features" condition="image">utilman.exe</ParentImage>
+                    <ParentImage name="Accessibility Features" condition="image">osk.exe</ParentImage>
+                    <ParentImage name="Accessibility Features" condition="image">Magnify.exe</ParentImage>
+                    <ParentImage name="Accessibility Features" condition="image">DisplaySwitch.exe</ParentImage>
+                    <ParentImage name="Accessibility Features" condition="image">Narrator.exe</ParentImage>
+                    <ParentImage name="Accessibility Features" condition="image">AtBroker.exe</ParentImage>
+				</Rule>
+			</ProcessCreate>	
+			
+		</RuleGroup>
+		
+		<RuleGroup name="include_users_and_temp_folders" groupRelation="or">
+			<ProcessTerminate onmatch="include">
+				<Image condition="begin with">C:\Users</Image>				<!--Process terminations by user binaries-->
+				<Image condition="begin with">C:\Temp</Image>				<!--Process terminations by temp binaries-->
+				<Image condition="begin with">C:\Windows\Temp</Image>	
+            </ProcessTerminate>
+		</RuleGroup>
+		
+		<RuleGroup name="" groupRelation="or">
+			<ProcessCreate onmatch="exclude">
+				<Rule>
+					<ParentImage condition="is">C:\Program Files (x86)\Site24x7\WinAgent\monitoring\bin\MonitoringAgent.exe</ParentImage>
+					<ParentImage condition="is">C:\Program Files (x86)\Site24x7\WinAgent\monitoring\bin\AppBin\Site24x7AppAgent.exe</ParentImage>
+					<ParentImage condition="is">C:\Program Files (x86)\Kaseya\SHE12399865003131473\extensions\Lua.exe</ParentImage>
+					<ParentCommandLine condition="contains">\Site24x7\</ParentCommandLine>
+					<CurrentDirectory condition="begin with">D:\Azure_DevOps_Agents</CurrentDirectory>
+					<CurrentDirectory condition="contains">\Azure_DevOps_Agents\</CurrentDirectory>
+					<CurrentDirectory condition="contains">\Azure-DevOps_Agents\</CurrentDirectory>
+				</Rule>
+
+				<Rule groupRelation="and">
+                   		     <ParentImage condition="contains">svchost.exe</ParentImage>
+		                     <Image condition="end with">cmd.exe</Image>
+				     <CommandLine condition="contains">Applications</CommandLine>
+				</Rule>
+			</ProcessCreate>
+		</RuleGroup>
+		
+		<RuleGroup name="" groupRelation="or">
+			<FileCreateTime onmatch="include">
+				<Rule>
+				  <TargetFilename name="Timestamp" condition="end with">.exe</TargetFilename> <!--Look for backdated executables anywhere-->
+				  <Image name="Timestomp" condition="begin with">C:\Temp</Image>        <!--Look for timestomping in temp folders-->
+			      <Image name="Timestomp" condition="begin with">C:\Windows\Temp</Image>
+				  <Image name="Timestomp" condition="begin with">C:\Tmp</Image>
+				  <Image name="Timestomp" condition="begin with">C:\Users</Image>
+				  <Image name="Timestomp" condition="begin with">\Device\HarddiskVolumeShadowCopy</Image> <!--Nothing should be written here | Credit: @SBousseaden [ https://twitter.com/SBousseaden/status/1133030955407630336 ] -->
+				</Rule>
+			</FileCreateTime>
+		</RuleGroup>
+		
+		
+		<RuleGroup name="" groupRelation="or">
+			<FileCreateTime onmatch="exclude">
+				<Rule>
+				   <Image condition="end with">AppData\Local\Google\Chrome\Application\chrome.exe</Image>				<!--chrome constantly changes files-->
+				   <Image condition="end with">Root\VFS\ProgramFilesX86\Google\Chrome\Application\chrome.exe</Image>	<!--chrome constantly changes files-->
+				</Rule>
+			</FileCreateTime>
+		</RuleGroup>
+		
+		
+
+	
+		<RuleGroup name="" groupRelation="or">
+            <DriverLoad onmatch="exclude">
+                <!--COMMENT:	Because drivers with bugs can be used to escalate to kernel permissions, be extremely selective
+				about what you exclude from monitoring. Low event volume, little incentive to exclude.-->
+                <!--Exclude Microsoft drivers with valid signature-->
+                <Rule groupRelation="and">
+                    <Signature condition="contains">Microsoft</Signature>
+                    <SignatureStatus condition="is">Valid</SignatureStatus>
+                </Rule>
+				
+				<Rule groupRelation="and">
+                    <Signature condition="begin with">Intel </Signature>
+                    <SignatureStatus condition="is">Valid</SignatureStatus>
+				</Rule>
+            </DriverLoad>
+        </RuleGroup>
+		
+	<RuleGroup name="" groupRelation="or">
+			<ImageLoad onmatch="exclude">
+				<Rule groupRelation="and">
+                   <!--    COMMENT: Removes unnecessary ImageLoaded events. These 4 DLLs flag as Process Injection normally --> 
+                   <!--    COMMENT: I consider this to be noise - there are many other notifications PowerShell has been started. -->
+                   <Image condition="is">powershell.exe</Image>
+                   <OriginalFileName condition="excludes all">mscoree.dll;mscoreei.dll;mscoreeis.dll;clr.dll;clrjit.dll</OriginalFileName>
+				</Rule>
+				 <!--COMMENT:	Filtering these commonly loaded DLLs, which are so verbose they incur a lot of cost and have limited to no detection value-->
+				
+				<Rule groupRelation="and">
+					<Image condition="is">C:\Windows\System32\svchost.exe</Image>
+					<ImageLoaded condition="is">C:\Windows\System32\netapi32.dll</ImageLoaded>
+				</Rule>
+		
+				<Rule groupRelation="and">
+					<Image condition="is">C:\Windows\System32\svchost.exe</Image>
+					<ImageLoaded condition="is">C:\Windows\System32\msvcp110_win.dll</ImageLoaded>
+				</Rule>
+		
+				<Rule groupRelation="and">
+					<Image condition="is">C:\Windows\System32\svchost.exe</Image>
+					<ImageLoaded condition="is">C:\Windows\System32\dsreg.dll</ImageLoaded>
+				</Rule>
+		
+				<Rule groupRelation="and">
+					<Image condition="is">C:\Windows\System32\svchost.exe</Image>
+					<ImageLoaded condition="is">C:\Windows\System32\perfctrs.dll</ImageLoaded>
+				</Rule>
+			</ImageLoad>
+    </RuleGroup>
+		
+		<RuleGroup name="" groupRelation="or">
+			<ImageLoad onmatch="include">
+			 <Rule groupRelation="or">
+				<ImageLoaded name="DLL Side-Loading" condition="contains any">admin$;c$;\\;\appdata\;\temp\</ImageLoaded>				<!-- loaded from network file share -->
+				<ImageLoaded condition="begin with" name="DLL Side-Loading">c:\programdata\</ImageLoaded>
+				<ImageLoaded condition="begin with" name="DLL Side-Loading">C:\Windows\Media\</ImageLoaded>
+				<ImageLoaded condition="begin with" name="DLL Side-Loading">C:\Windows\addins\</ImageLoaded>
+				<ImageLoaded condition="begin with" name="DLL Side-Loading">C:\Windows\system32\config\systemprofile\</ImageLoaded>
+				<ImageLoaded condition="begin with" name="DLL Side-Loading">C:\Windows\Debug\</ImageLoaded>
+				<ImageLoaded condition="begin with" name="DLL Side-Loading">C:\Windows\Temp</ImageLoaded>
+				<ImageLoaded condition="begin with" name="DLL Side-Loading">C:\PerfLogs\</ImageLoaded>
+				<ImageLoaded condition="begin with" name="DLL Side-Loading">C:\Windows\Help\</ImageLoaded>
+				<ImageLoaded condition="begin with" name="DLL Side-Loading">C:\Intel\Logs\</ImageLoaded>
+				<ImageLoaded condition="begin with" name="DLL Side-Loading">C:\Temp</ImageLoaded>
+				<ImageLoaded condition="begin with" name="DLL Side-Loading">C:\Windows\repair\</ImageLoaded>
+				<ImageLoaded condition="begin with" name="DLL Side-Loading">C:\Windows\security\</ImageLoaded>
+				<ImageLoaded condition="begin with" name="DLL Side-Loading">C:\Windows\Fonts\</ImageLoaded>
+				<ImageLoaded condition="contains" name="DLL Side-Loading">Downloads</ImageLoaded>
+				<ImageLoaded condition="contains" name="DLL Side-Loading">Public</ImageLoaded>
+				<ImageLoaded condition="contains" name="DLL Side-Loading">Documents</ImageLoaded>
+				<ImageLoaded condition="contains" name="DLL Side-Loading">Music</ImageLoaded>
+				<ImageLoaded condition="contains" name="DLL Side-Loading">Video</ImageLoaded>
+				<ImageLoaded condition="begin with" name="technique_name=DLL Side-Loading">file:</ImageLoaded>
+				<ImageLoaded name="DLL Side-Loading" condition="contains">$Recycle.bin\</ImageLoaded>
+				<ImageLoaded name="DLL Side-Loading" condition="contains">\Windows\IME\</ImageLoaded>
+				<ImageLoaded name="Windows Scheduled Tasks" condition="end with">mstask.dll</ImageLoaded>
+			</Rule>	
+			
+			<Rule groupRelation="and">
+				<Image name="technique_id=T1037.005,technique_name=Boot or Logon Initialization Scripts - Startup Items" condition="end with">bginfo.exe</Image>
+				<ImageLoaded condition="contains any">System.ni.dll;System.Core.ni.dll</ImageLoaded>
+			</Rule>
+	<!--
+	        <Rule groupRelation="and">
+              <OriginalFileName name="technique_id=T1055,technique_name=Process Injection" condition="is">clr.dll</OriginalFileName>
+              <Image condition="excludes">C:\Windows\Microsoft.NET\</Image>
+            </Rule>
+            <Rule groupRelation="and">
+              <OriginalFileName name="technique_id=T1055,technique_name=Process Injection" condition="is">clrjit.dll</OriginalFileName>
+              <Image condition="excludes">C:\Windows\Microsoft.NET\</Image>
+            </Rule>
+            <Rule groupRelation="and">
+              <OriginalFileName name="technique_id=T1055,technique_name=Process Injection" condition="is">mscoreei.dll</OriginalFileName>
+              <Image condition="excludes">C:\Windows\Microsoft.NET\</Image>
+            </Rule>
+            <Rule groupRelation="and">
+              <OriginalFileName name="technique_id=T1055,technique_name=Process Injection" condition="is">mscoree.dll</OriginalFileName>
+              <Image condition="excludes">C:\Windows\Microsoft.NET\</Image>
+            </Rule>
+            <Rule groupRelation="and">
+              <OriginalFileName name="technique_id=T1055,technique_name=Process Injection" condition="is">mscoreeis.dll</OriginalFileName>
+              <Image condition="excludes">C:\Windows\Microsoft.NET\</Image>
+            </Rule>
+            <Rule groupRelation="and">
+              <OriginalFileName name="technique_id=T1055,technique_name=Process Injection" condition="is">mscorlib.dll</OriginalFileName>
+              <Image condition="excludes">C:\Windows\Microsoft.NET\</Image>
+            </Rule>
+            <Rule groupRelation="and">
+              <OriginalFileName name="technique_id=T1055,technique_name=Process Injection" condition="is">mscorlib.ni.dll</OriginalFileName>
+              <Image condition="excludes">C:\Windows\Microsoft.NET\</Image>
+            </Rule>
+			-->
+		   </ImageLoad>
+		</RuleGroup>
+		
+		
+		<RuleGroup name="" groupRelation="or">
+			<CreateRemoteThread onmatch="include">
+				<SourceImage name="technique_id=T1055,technique_name=Process Injection" condition="begin with">C:\</SourceImage>
+				<SourceImage name="technique_id=T1055,technique_name=Process Injection" condition="begin with">\\</SourceImage>
+			</CreateRemoteThread>
+		</RuleGroup>
+	
+		<RuleGroup name="" groupRelation="or">
+			<CreateRemoteThread onmatch="exclude">
+				<!--COMMENT:	Monitor for processes injecting code into other processes. Often used by malware to cloak their actions.
+				Exclude mostly-safe sources and log anything else.-->
+				<Rule groupRelation="or">
+					<SourceImage condition="is">C:\Windows\System32\wbem\WmiPrvSE.exe</SourceImage>
+					<TargetImage condition="end with">Google\Chrome\Application\chrome.exe</TargetImage>
+					<SourceImage condition="is">C:\Windows\System32\svchost.exe</SourceImage>
+					<SourceImage condition="is">C:\Windows\System32\wininit.exe</SourceImage>
+					<SourceImage condition="is">C:\Windows\System32\csrss.exe</SourceImage>
+					<SourceImage condition="is">C:\Windows\System32\services.exe</SourceImage>
+					<SourceImage condition="is">C:\Windows\System32\winlogon.exe</SourceImage>
+					<SourceImage condition="is">C:\Windows\System32\audiodg.exe</SourceImage>
+					<SourceImage condition="end with">EPSecurityService.exe</SourceImage>
+				</Rule>
+				<Rule groupRelation="and">
+					<SourceImage condition="is">C:\Windows\System32\dwm.exe</SourceImage>
+					<TargetImage condition="is">C:\Windows\System32\csrss.exe</TargetImage>
+				</Rule>
+			</CreateRemoteThread>
+		</RuleGroup>
+		
+		
+		    
+			
+	   <RuleGroup name="" groupRelation="or">
+         <ProcessAccess onmatch="include">
+          <Rule groupRelation="and"><!-- https://medium.com/falconforce/falconfriday-direct-system-calls-and-cobalt-strike-bofs-0xff14-741fa8e1bdd6 -->
+            <CallTrace name="technique_id=T1055,technique_name=Process Injection" condition="not begin with">C:\Windows\SYSTEM32\ntdll.dll</CallTrace>
+            <CallTrace name="technique_id=T1055,technique_name=Process Injection" condition="not begin with">C:\Windows\SYSTEM32\win32u.dll</CallTrace>
+            <CallTrace name="technique_id=T1055,technique_name=Process Injection" condition="not begin with">C:\Windows\SYSTEM32\wow64win.dll</CallTrace>
+			<SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="begin with">C:\PerfLogs\</SourceImage>
+			<SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="begin with">C:\$Recycle.bin\</SourceImage>
+			<SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="begin with">C:\Intel\Logs\</SourceImage>
+			<SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="begin with">C:\Users\Default\</SourceImage>
+			<SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="begin with">C:\Users\Public\</SourceImage>
+			<SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="begin with">C:\Users\NetworkService\</SourceImage>
+			<SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="begin with">C:\Windows\Fonts\</SourceImage>
+			<SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="begin with">C:\Windows\Debug\</SourceImage>
+			<SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="begin with">C:\Windows\Media\</SourceImage>
+			<SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="begin with">C:\Windows\Help\</SourceImage>
+			<SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="begin with">C:\Windows\addins\</SourceImage>
+			<SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="begin with">C:\Windows\repair\</SourceImage>
+			<SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="begin with">C:\Windows\security\</SourceImage>
+			<SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="begin with">C:\Windows\system32\config\systemprofile\</SourceImage>
+			<SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="contains">VolumeShadowCopy</SourceImage>
+			<SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="contains">\htdocs\</SourceImage>
+			<SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="contains">\wwwroot\</SourceImage>
+			<GrantedAccess name="technique_id=T1055.012,technique_name=Process Hollowing">0x0800</GrantedAccess>            <!-- PROCESS_SUSPEND_RESUME -->
+            <GrantedAccess name="technique_id=T1003,technique_name=Credential Dumping">0x0810</GrantedAccess>            <!-- PROCESS_SUSPEND_RESUME + PROCESS_VM_READ - possible memory dump to extract sensitive information -->
+            <GrantedAccess name="technique_id=T1055,technique_name=Process Injection">0x0820</GrantedAccess>            <!-- PROCESS_SUSPEND_RESUME + PROCESS_VM_WRITE - possible memory injection -->
+            <GrantedAccess name="technique_id=T1055.012,technique_name=Process Hollowing">0x800</GrantedAccess>            <!-- PROCESS_SUSPEND_RESUME -->
+            <GrantedAccess name="technique_id=T1003,technique_name=Credential Dumping">0x810</GrantedAccess>            <!-- PROCESS_SUSPEND_RESUME + PROCESS_VM_READ - possible memory dump to extract sensitive information -->
+            <GrantedAccess name="technique_id=T1055,technique_name=Process Injection">0x820</GrantedAccess>            <!-- PROCESS_SUSPEND_RESUME + PROCESS_VM_WRITE - possible memory injection -->
+          </Rule>
+		  
+		  <Rule groupRelation="and">
+            <SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="contains">\AppData\</SourceImage>
+            <SourceImage condition="not end with">\AppData\Local\Microsoft\Teams\current\Teams.exe</SourceImage>
+          </Rule>
+<!--
+		  <Rule groupRelation="and">
+			<CallTrace name="technique_id=T1055.001,technique_name=Dynamic-link Library Injection" condition="contains all">C:\Windows\SYSTEM32\ntdll.dll;C:\Windows\System32\kernelbase.dll;UNKNOWN</CallTrace>          
+			<GrantedAccess name="technique_id=T1055.001,technique_name=Dynamic-link Library Injection" condition="contains any">0x1F0FFF;0x1F1FFF;0x143A;0x1410;0x1010;0x1F2FFF;0x1F3FFF;0x1FFFFF;0x147A</GrantedAccess>
+		  </Rule>
+-->		  
+         </ProcessAccess>
+       </RuleGroup>
+
+		<RuleGroup name="" groupRelation="or">
+			<ProcessAccess onmatch="exclude">
+				<SourceImage name="technique_id=T1036,technique_name=Masquerading" condition="contains">\Temp\</SourceImage>
+			</ProcessAccess>
+		</RuleGroup>
+	
+	
+
+     <RuleGroup name="" groupRelation="or">
+			<FileCreateStreamHash onmatch="include">
+				<TargetFilename condition="end with">.vb</TargetFilename>				<!--VisualBasicScripting files-->
+				<TargetFilename condition="end with">.vbe</TargetFilename>				<!--VisualBasicScripting files-->
+				<TargetFilename condition="end with">.vbs</TargetFilename>				<!--VisualBasicScripting files-->
+		        <TargetFilename condition="contains">Downloads</TargetFilename> <!--Downloaded files. Does not include "Run" files in IE-->
+                <TargetFilename condition="contains">AppData</TargetFilename>
+                <TargetFilename condition="contains">Temp</TargetFilename>
+                <TargetFilename condition="contains">ProgramData</TargetFilename>
+                <TargetFilename condition="contains">Users</TargetFilename>
+				<TargetFilename condition="end with">.reg</TargetFilename>        <!--Registry File-->
+				<TargetFilename name="technique_id=T1059.001,technique_name=PowerShell" condition="end with">.ps1</TargetFilename>				<!--Powershell-->
+				<TargetFilename name="technique_id=T1059.001,technique_name=PowerShell" condition="end with">.ps2</TargetFilename>				<!--Powershell-->
+				<TargetFilename condition="end with">.hta</TargetFilename>        <!--Mitre T1218.005-->        <!--Scripting-->
+				<TargetFilename condition="end with">.exe</TargetFilename>
+				<TargetFilename condition="end with">.dll</TargetFilename>
+				<TargetFilename condition="end with">Temp\debug.bin</TargetFilename>        <!--Bin files https://github.com/GhostPack/SafetyKatz creates debug.bin in a temp folder-->
+				<TargetFilename condition="end with">.bat</TargetFilename>				<!--Batch scripting-->
+				<TargetFilename condition="end with">.cmd</TargetFilename>				<!--Batch scripting | Credit @ion-storm -->
+				<TargetFilename condition="contains">Temp\7z</TargetFilename>            <!--7zip extractions-->
+				<Rule name="technique_id=T1189,technique_name=Drive-by Compromise" groupRelation="and">					<!--https://twitter.com/SecurityJosh-->
+					<TargetFilename condition="end with">:Zone.Identifier</TargetFilename>
+					<Contents condition="contains any">blob:;about:internet</Contents>
+				</Rule>
+			</FileCreateStreamHash>
+	</RuleGroup>
+	
+	
+	
+		<RuleGroup name="" groupRelation="or">
+			<ProcessTampering onmatch="exclude">
+				<Image condition="is">C:\Windows\System32\wbem\WMIADAP.exe</Image>
+				<Image condition="is">C:\Program Files\Microsoft VS Code\Code.exe</Image>
+				<Image condition="contains">unknown process</Image>
+				<Image condition="is">C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe</Image>
+				<Rule groupRelation="and">
+					<Image condition="begin with">C:\Program Files (x86)\Microsoft\Edge\Application\</Image>
+					<Image condition="end with">\BHO\ie_to_edge_stub.exe</Image>
+				</Rule>
+				<Rule groupRelation="and">
+					<Image condition="begin with">C:\Program Files (x86)\Microsoft\Edge\Application\</Image>
+					<Image condition="end with">\identity_helper.exe</Image>
+				</Rule>
+				<Rule groupRelation="and">
+					<Image condition="begin with">C:\Program Files (x86)\Microsoft\EdgeUpdate\Install\</Image>
+					<Image condition="contains">\MicrosoftEdge_X64_</Image>
+				</Rule>
+				<Image condition="is">C:\Program Files\Git\cmd\git.exe</Image>
+				<Image condition="is">C:\Program Files\Git\mingw64\bin\git.exe</Image>
+				<Image condition="is">C:\Program Files\Git\mingw64\libexec\git-core\git.exe</Image>
+				<Image condition="is">C:\Program Files\Mozilla Firefox\firefox.exe</Image>
+				<Image condition="is">C:\Program Files\Mozilla Firefox\updater.exe</Image>
+				<Image condition="is">C:\Program Files\Mozilla Firefox\default-browser-agent.exe</Image>
+				<Image condition="is">C:\Program Files\Mozilla Firefox\pingsender.exe</Image>
+			</ProcessTampering>
+		</RuleGroup>
+		
+		
+		
+		<RuleGroup name="" groupRelation="or">
+         <FileDeleteDetected onmatch="include">
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\ProgramData\Intel</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\ProgramData\Mozilla</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\ProgramData\chocolatey\logs</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\ProgramData\Microsoft\DeviceSync</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\ProgramData\Microsoft\PlayReady</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\ProgramData\Microsoft\User Account Pictures</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\ProgramData\Microsoft\Crypto\DSS\MachineKeys</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\ProgramData\Microsoft\Crypto\RSA\MachineKeys</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\ProgramData\Microsoft\NetFramework\BreadcrumbStore</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\ProgramData\Microsoft\Office\Heartbeat</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\ProgramData\Microsoft\Windows\WER\ReportQueue</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\ProgramData\Microsoft\Windows\WER\Temp</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Users\All Users\Intel</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Users\All Users\Mozilla</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Users\All Users\chocolatey\logs</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Users\All Users\Microsoft\DeviceSync</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Users\All Users\Microsoft\PlayReady</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Users\All Users\Microsoft\User Account Pictures</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Users\All Users\Microsoft\Crypto\DSS\MachineKeys</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Users\All Users\Microsoft\Crypto\RSA\MachineKeys</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Users\All Users\Microsoft\NetFramework\BreadcrumbStore</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Users\All Users\Microsoft\Office\Heartbeat</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Users\All Users\Microsoft\Windows\WER\ReportArchive</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Users\All Users\Microsoft\Windows\WER\ReportQueue</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Users\All Users\Microsoft\Windows\WER\Temp</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Windows\Tasks</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Windows\tracing</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Windows\Registration\CRMLog</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Windows\System32\Tasks</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Windows\System32\Microsoft\Crypto\RSA\MachineKeys</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Windows\System32\spool\drivers\color</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Windows\SysWOW64\Tasks</TargetFilename>
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+			<Rule groupRelation="and">
+               <TargetFilename condition="contains">\Downloads\</TargetFilename>               <!--User Download folder-->
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="contains">\Appdata\Local\Temp\</TargetFilename>               <!--User Temp folder-->
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+            <Rule groupRelation="and">
+               <TargetFilename condition="contains">\Appdata\Local\Microsoft\Windows\INetCache\Content.Outlook\</TargetFilename>               <!--Microsoft Outlook Temp folder-->
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+			<Rule groupRelation="and">
+               <TargetFilename condition="begin with">C:\Program Files\Qualys\QualysAgent</TargetFilename>               <!--Writable for all users-->
+               <TargetFilename condition="contains any">.com;.bat;.exe;.reg;.ps1;.vbs;.vba;.lnk;.doc;.xls;.hta;.bin;.7z;.dll;.xla;.cmd;.sh;.lnk;.pptm;.scr;.msi;.sct</TargetFilename>
+            </Rule>
+			<Rule groupRelation="and">
+               <TargetFilename condition="contains all">C:\PS-Transcripts\;PowerShell_transcript</TargetFilename>               <!--Default PowerShell transcript folder-->
+               <TargetFilename condition="contains">.txt</TargetFilename>
+            </Rule>
+			<TargetFilename condition="contains all">C:\Program Files\Microsoft SQL Server;\Shared\ErrorDumps</TargetFilename>            <!--Writable for all users-->
+            <TargetFilename condition="contains all">C:\Program Files\Microsoft SQL Server;\DataDumps</TargetFilename>            <!--Writable for all users-->
+            <TargetFilename condition="contains all">C:\Program Files (X86)\Microsoft SQL Server\;Shared\ErrorDumps</TargetFilename>            <!--Writable for all users-->
+         </FileDeleteDetected>
+		</RuleGroup> 
+		 
+      <RuleGroup name="" groupRelation="or">
+         <FileDeleteDetected onmatch="exclude">
+            <User condition="contains any">NETWORK SERVICE; LOCAL SERVICE</User>
+			<Image condition="is">C:\Program Files\Microsoft SQL Server\140\DTS\Binn\DTExec.exe</Image>
+         </FileDeleteDetected>
+      </RuleGroup>
+	  
+	  <RuleGroup name="" groupRelation="or">
+         <FileExecutableDetected onmatch="include">
+               <TargetFilename condition="begin with">C:\ProgramData\Intel</TargetFilename>
+               <TargetFilename condition="begin with">C:\ProgramData\Mozilla</TargetFilename>
+               <TargetFilename condition="begin with">C:\ProgramData\chocolatey\</TargetFilename>
+               <TargetFilename condition="begin with">C:\ProgramData\Microsoft\DeviceSync</TargetFilename>
+               <TargetFilename condition="begin with">C:\ProgramData\Microsoft\PlayReady</TargetFilename>
+               <TargetFilename condition="begin with">C:\ProgramData\Microsoft\User Account Pictures</TargetFilename>
+               <TargetFilename condition="begin with">C:\ProgramData\Microsoft\Office\Heartbeat</TargetFilename>
+               <TargetFilename condition="begin with">C:\ProgramData\Microsoft\Windows\WER</TargetFilename>
+               <TargetFilename condition="begin with">C:\Users\All Users\</TargetFilename>
+               <TargetFilename condition="begin with">C:\Windows\Tasks</TargetFilename>
+               <TargetFilename condition="begin with">C:\Windows\tracing</TargetFilename>
+               <TargetFilename condition="begin with">C:\Windows\System32\Tasks</TargetFilename>
+               <TargetFilename condition="begin with">C:\Windows\System32\spool\drivers\color</TargetFilename>
+               <TargetFilename condition="begin with">C:\Windows\SysWOW64\Tasks</TargetFilename>
+			   <Image name="technique_id=T1021.006,technique_name=Windows Remote Management" condition="is">wsmprovhost.exe</Image>
+			   <Image name="technique_id=T1021.006,technique_name=Windows Remote Management" condition="is">winrshost.exe</Image>
+			   <Image name="technique_id=T1021.006,technique_name=Windows Remote Management" condition="image">winrm.cmd</Image>
+			    <TargetFilename condition="contains">\Downloads\</TargetFilename>               <!--User Download folder-->
+				<TargetFilename condition="contains">\Appdata\Local\Temp\</TargetFilename>               <!--User Temp folder-->
+				<TargetFilename condition="contains">\Appdata\Local\Microsoft\Windows\INetCache\Content.Outlook\</TargetFilename>
+				<Image name="technique_id=T1059.003,technique_name=Windows Command Shell" condition="is">cmd.exe</Image>
+				<Image name="technique_id=T1059.001,technique_name=PowerShell" condition="image">powershell.exe</Image>
+				<Image name="technique_id=T1059.001,technique_name=PowerShell" condition="image">pwsh.exe</Image>
+				<Image name="technique_id=T1059.001,technique_name=PowerShell" condition="image">powershell_ise.exe</Image>
+				<Image name="technique_id=T1059.001,technique_name=PowerShell" condition="contains">Sqlps.exe</Image>
+				<TargetFilename condition="begin with">C:\Program Files\Qualys\QualysAgent</TargetFilename>      
+				<Image name="technique_id=T1127,technique_name=Trusted Developer Utilities Proxy Execution" condition="is">MSBuild.exe</Image>
+				<Image name="technique_id=T1546.008,technique_name=Windows Error Reporting" condition="contains">werfault.exe</Image>
+				<Image name="technique_id=T1574.002,technique_name=DLL Side-Loading" condition="is">odbcconf.exe</Image> <!--Microsoft:Windows: allows for driver loads -->
+				<Image name="technique_id=T1027.004,technique_name=Compile After Delivery" condition="is">csc.exe</Image>
+				<Image name="technique_id=T1543.003,technique_name=Windows Service" condition="is">sc.exe</Image>
+				<Image name="technique_id=T1489,technique_name=Service Stop" condition="is">taskkill.exe</Image>
+				<Image name="technique_id=T1074,technique_name=Data Staged" condition="is">xcopy.exe</Image>
+				<Image name="technique_id=T1074,technique_name=Data Staged" condition="is">robocopy.exe</Image>
+				<Image name="technique_id=T,technique_name=" condition="is">makecab.exe</Image>
+				<Image name="technique_id=T1105,technique_name=Remote File Copy" condition="is">GfxDownloadWrapper.exe</Image>
+				<Image name="technique_id=T1105,technique_name=Remote File Copy" condition="is">expand.exe</Image>
+				<Image name="technique_id=T1105,technique_name=Ingress Tool Transfer" condition="is">curl.exe</Image>
+				<Image name="technique=T1105,technique_name=Ingress Tool Transfer" condition="is">ftp.exe</Image>
+				<Image name="technique_id=T1564.004,technique_name=NTFS File Attributes" condition="is">extrac32.exe</Image>
+				<Image name="technique_id=T1053.005,technique_name=Scheduled Task/Job" condition="contains any">schtasks.exe;sctasks.exe</Image>
+				<Image name="technique=T1053.002,technique_name=At" condition="contains any">at.exe;At.exe</Image>
+				<Image name="technique_id=T1053,technique_name=Scheduled Task/Job" condition="is">taskeng.exe</Image>
+				<Image name="technique_id=T1047,technique_name=Windows Management Instrumentation" condition="begin with">C:\WINDOWS\system32\wbem\scrcons.exe</Image>
+				<Image name="technique_id=T1047,technique_name=Windows Management Instrumentation" condition="is">wmiprvse.exe</Image>
+				<Image condition="is">wevtutil.exe</Image>
+				<Image name="technique_id=T1202,technique_name=Indirect Command Execution" condition="image">pcalua.exe</Image> <!--Microsoft:Windows: Program Compatibility Assistant)-->
+				<Image name="technique_id=T1202,technique_name=Indirect Command Execution" condition="is">cscript.exe</Image>
+				<Image name="technique_id=T1202,technique_name=Indirect Command Execution" condition="is">wscript.exe</Image>
+				<Image name="technique_id=T1202,technique_name=Indirect Command Execution" condition="is">bash.exe</Image> <!--Microsoft:Windows: bash on Windows, Linux subsystem-->
+				<Image name="technique_id=T1202,technique_name=Indirect Command Execution" condition="is">certutil.exe</Image>
+				<Image name="technique_id=T1202,technique_name=Indirect Command Execution" condition="is">winrs.exe</Image>
+				<Image name="technique_id=T1202,technique_name=Indirect Command Execution" condition="image">control.exe</Image> <!-- https://twitter.com/rikvduijn/status/853251879320662017 -->
+				<Image name="technique_id=T1202,technique_name=Indirect Command Execution" condition="is">desktopimgdownldr.exe</Image>
+				<Image name="technique_id=T1202,technique_name=Indirect Command Execution" condition="is">wsl.exe</Image>
+				<Image name="technique_id=T1218.001,technique_name=Compiled HTML File" condition="is">hh.exe</Image> <!--Microsoft:Windows: HTML Helper-->
+				<Image name="technique_id=T1218.004,technique_name=InstallUtil" condition="is">installutil.exe</Image>
+				<Image name="technique_id=T1218.005,technique_name=Mshta" condition="image">mshta.exe</Image>
+				<Image name="technique_id=T1218.005,technique_name=Mshta" condition="is">mshta.exe</Image>
+				<Image name="technique_id=T1218.010,technique_name=Regsvr32" condition="is">regsvr32.exe</Image> <!--Mitre T1218.010--> <!--Mitre T1085--> <!--Microsoft:Windows: [ https://subt0x10.blogspot.com/2016/04/bypass-application-whitelisting-script.html ] -->
+				<Image name="technique_id=T1218.011,technique_name=rundll32.exe" condition="contains">rundll32.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">InfDefaultInstall.EXE</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">extexport.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">msconfig.EXE</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">msiexec.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">odbcconf.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">PresentationHost.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">rasdlui.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">RegisterCimProvider2.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">RegisterCimProvider.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">ScriptRunner.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">verclsid.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">wab.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">wab.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">wsreset.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">Appvlp.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">csi.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">devtoolslauncher.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="contains">Scriptrunner.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">tttracer.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">msdt.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">rasautou.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">Register-cimprovider.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">diskshadow.exe</Image> <!--This only applies to versions of Windows Server-->
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="is">replace.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="image">jjs.exe</Image>
+				<Image name="technique_id=T1218,technique_name=System Binary Proxy Execution" condition="image">appcmd.exe</Image>
+				<Image name="technique_id=T1127,technique_name=Trusted Developer Utilities Proxy Execution" condition="contains">vbc.exe</Image>
+				<Image name="technique_id=T1127,technique_name=Trusted Developer Utilities Proxy Execution" condition="is">csc.exe</Image>
+				<Image name="technique_id=T1127,technique_name=Trusted Developer Utilities Proxy Execution" condition="is">dfsvc.exe</Image>
+				<Image name="technique_id=T1127,technique_name=Trusted Developer Utilities Proxy Execution" condition="is">mftrace.exe</Image>
+				<Image name="technique_id=T1127,technique_name=Trusted Developer Utilities Proxy Execution" condition="is">dxcap.exe</Image>
+				<Image name="technique_id=T1127,technique_name=Trusted Developer Utilities Proxy Execution" condition="is">ilasm.exe</Image>
+				<Image name="technique_id=T1127,technique_name=Trusted Developer Utilities Proxy Execution" condition="is">jsc.exe</Image>
+				
+				<Image name="technique_id=T1127,technique_name=Trusted Developer Utilities Proxy Execution" condition="is">Microsoft.Workflow.Compiler.exe</Image>
+				<Image name="technique_id=T1127,technique_name=Trusted Developer Utilities Proxy Execution" condition="is">vsjitdebugger.exe</Image>
+				<Image name="technique_id=T1127,technique_name=Trusted Developer Utilities Proxy Execution" condition="is">tracker.exe</Image>
+				<Image name="technique_id=T1127,technique_name=Trusted Developer Utilities Proxy Execution" condition="is">te.exe</Image>
+				<Image name="technique_id=T1127,technique_name=Trusted Developer Utilities Proxy Execution" condition="is">rcsi.exe</Image>
+				<Image name="technique_id=T1127,technique_name=Trusted Developer Utilities Proxy Execution" condition="is">Microsoft.Workflow.Compiler.exe</Image> <!--https://lolbas-project.github.io/lolbas/Binaries/Microsoft.Workflow.Compiler/-->
+				<Image name="technique_id=T1127,technique_name=Trusted Developer Utilities Proxy Execution" condition="is">jsc.exe</Image> <!-- https://lolbas-project.github.io/lolbas/Binaries/Jsc/ -->
+         </FileExecutableDetected>
+      </RuleGroup>
+	  
+	  <RuleGroup name="" groupRelation="or">
+         <FileExecutableDetected onmatch="exclude">
+            <Image condition="is">C:\Program Files\Microsoft SQL Server\140\DTS\Binn\DTExec.exe</Image>
+			<Image condition="is">C:\Windows\Microsoft.NET\Framework64\v4.0.30319\Vbc.exe</Image>
+			<TargetFilename condition="begin with">D:\Hosting\</TargetFilename>
+			<Image condition="end with">Csc.exe</Image>
+			<Image condition="contains">Hosting</Image>
+			
+			<Rule groupRelation="and">
+				<Image condition="end with">Csc.exe</Image>
+				<TargetFilename condition="begin with">C:\Users\gSQLAgtLVTCONCW$</TargetFilename>
+			</Rule>
+         </FileExecutableDetected>
+      </RuleGroup>
+	  
+	  
+	</EventFiltering>
+</Sysmon>
